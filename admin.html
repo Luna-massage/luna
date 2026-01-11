@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Panel - Luna Massage</title>
+    <!-- Add this AFTER your existing styles but BEFORE your script tag -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -340,25 +342,38 @@
         </div>
     </div>
 
-    <script>
-        // Configuration - Replace with your SheetDB API URL and Email Service URL
+        <script>
+        // Configuration
         const SHEETDB_URL = 'https://sheetdb.io/api/v1/2iae785e45y0u';
-        const EMAIL_SERVICE_URL = 'https://email-kift.onrender.com/send-confirmation';
+        
+        // EmailJS Configuration - REPLACE WITH YOUR ACTUAL VALUES
+        const EMAILJS_CONFIG = {
+            SERVICE_ID: 'service_6uxi424',           // From EmailJS dashboard
+            PUBLIC_KEY: '2bQtqNNP3Kd3VG7tE',           // From EmailJS dashboard
+            TEMPLATES: {
+                CONFIRMATION: 'template_qbwcahb',    // Template for confirmed bookings
+                REMINDER: 'template_7s5l0by'             // Template for reminders
+            }
+        };
 
-        // Admin credentials (In production, this should be server-side authenticated)
+        // Admin credentials
         const ADMIN_USERNAME = 'admin';
-        const ADMIN_PASSWORD_HASH = '123'; // Replace with proper authentication
+        const ADMIN_PASSWORD_HASH = '123';
 
         // State
         let allBookings = [];
         let selectedBooking = null;
         let currentFilter = 'all';
-        /*let autoRefreshInterval = null;*/
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             checkAuth();
             setupLoginForm();
+            
+            // Initialize EmailJS
+            if (EMAILJS_CONFIG.PUBLIC_KEY && EMAILJS_CONFIG.PUBLIC_KEY !== 'YOUR_PUBLIC_KEY') {
+                emailjs.init(EMAILJS_CONFIG.PUBLIC_KEY);
+            }
         });
 
         // Check if user is logged in
@@ -424,11 +439,6 @@
                 }
             });
         }
-
-        /* Start auto refresh
-        function startAutoRefresh() {
-            autoRefreshInterval = setInterval(loadBookings, 30000); // Refresh every 30 seconds
-        }*/
 
         // Load bookings from SheetDB
         async function loadBookings() {
@@ -630,7 +640,7 @@
                                         <p class="text-xs text-gray-500 mt-2 break-all font-mono">${booking.walletAddress || 'N/A'}</p>
                                     </div>
                                     <div class="flex gap-3">
-                                        <button onclick="showConfirmModal('${booking.bookingId}')" class="flex-1 btn-primary text-white py-3 rounded-xl font-semibold text-sm">
+                                        <button onclick="showConfirmModal('${booking.bookingId}')" class="flex-1 bg-[#8B4513] hover:bg-[#A0522D] text-white py-3 rounded-xl font-semibold text-sm">
                                             ✓ Confirm Payment
                                         </button>
                                         <button onclick="showBookingDetail('${booking.bookingId}')" class="flex-1 border-2 border-[#8B5A2B] text-[#8B5A2B] py-3 rounded-xl font-semibold text-sm hover:bg-[#8B5A2B] hover:text-white transition">
@@ -779,7 +789,82 @@ Mark as Completed
             document.getElementById('confirmModal').classList.remove('flex');
         }
 
-        // Process confirmation
+        // EMAILJS FUNCTIONS
+        // Function to send email using EmailJS
+        async function sendEmailJS(booking, status) {
+            // Check if EmailJS is properly configured
+            if (!EMAILJS_CONFIG.SERVICE_ID || EMAILJS_CONFIG.SERVICE_ID === 'YOUR_SERVICE_ID') {
+                throw new Error('EmailJS is not configured. Please set up your EmailJS credentials.');
+            }
+
+            // Prepare template parameters
+            const templateParams = {
+                to_email: booking.email,
+                to_name: booking.name,
+                client_name: booking.name,
+                client_email: booking.email,
+                client_phone: booking.phone || 'Not provided',
+                booking_id: booking.bookingId || 'N/A',
+                service: booking.service || 'Unknown Service',
+                date: formatDate(booking.date),
+                time: formatTime(booking.time),
+                duration: getServiceDuration(booking.service), // You'll need to create this function
+                price: booking.servicePrice || '0',
+                crypto_amount: booking.cryptoAmount || '0',
+                crypto_type: booking.crypto || 'N/A',
+                wallet_address: booking.walletAddress || 'N/A',
+                special_requests: booking.specialRequests || 'None',
+                status: status === 'confirmed' ? 'Confirmed' : 'Reminder',
+                status_text: status === 'confirmed' ? 'Booking Confirmed' : 'Appointment Reminder',
+                business_name: 'Luna Massage',
+                business_phone: '(123) 456-7890',
+                business_email: 'info@lunamassage.com',
+                business_address: '123 Wellness Street, City, State 12345',
+                subject: status === 'confirmed' ? 'Booking Confirmed - Luna Massage' : 'Appointment Reminder - Luna Massage'
+            };
+
+            // Choose template based on status
+            let templateId;
+            if (status === 'confirmed') {
+                templateId = EMAILJS_CONFIG.TEMPLATES.CONFIRMATION;
+            } else if (status === 'reminder') {
+                templateId = EMAILJS_CONFIG.TEMPLATES.REMINDER;
+            } else {
+                throw new Error('Invalid email status');
+            }
+
+            try {
+                const response = await emailjs.send(
+                    EMAILJS_CONFIG.SERVICE_ID,
+                    templateId,
+                    templateParams
+                );
+                
+                console.log('EmailJS response:', response);
+                return { success: true, messageId: response.messageId };
+            } catch (error) {
+                console.error('EmailJS error:', error);
+                return { 
+                    success: false, 
+                    error: error.text || error.message 
+                };
+            }
+        }
+
+        // Helper function to get service duration (you can customize this)
+        function getServiceDuration(serviceName) {
+            const durationMap = {
+                'Swedish Massage': '60 minutes',
+                'Deep Tissue': '60 minutes',
+                'Sports Massage': '60 minutes',
+                'Hot Stone Therapy': '90 minutes',
+                'Aromatherapy': '60 minutes',
+                'Couples Massage': '90 minutes'
+            };
+            return durationMap[serviceName] || '60 minutes';
+        }
+
+        // Process confirmation with EmailJS
         async function processConfirmation() {
             closeConfirmModal();
             showLoading('Confirming payment and sending email...');
@@ -804,24 +889,15 @@ Mark as Completed
                     throw new Error('Failed to update booking status');
                 }
 
-                // Send confirmation email via Node.js service
-                const emailResponse = await fetch(EMAIL_SERVICE_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        booking: selectedBooking,
-                        status: 'confirmed'
-                    })
-                });
+                // Send confirmation email via EmailJS
+                const emailResult = await sendEmailJS(selectedBooking, 'confirmed');
 
-                if (emailResponse.ok) {
+                if (emailResult.success) {
                     showToast('Payment confirmed and confirmation email sent!');
                 } else {
                     // Email failed but booking was updated
-                    console.error('Email service error:', await emailResponse.text());
-                    showToast('Payment confirmed. Email will be sent shortly.');
+                    console.error('EmailJS error:', emailResult.error);
+                    showToast('Payment confirmed. Email failed: ' + emailResult.error, 'error');
                 }
 
                 // Reload bookings
@@ -906,7 +982,7 @@ Mark as Completed
             }
         }
 
-        // Resend confirmation email
+        // Resend confirmation email using EmailJS
         async function resendEmail(bookingId) {
             const booking = allBookings.find(b => b.bookingId === bookingId);
             if (!booking) return;
@@ -914,21 +990,12 @@ Mark as Completed
             showLoading('Sending email...');
 
             try {
-                const response = await fetch(EMAIL_SERVICE_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        booking: booking,
-                        status: 'reminder'
-                    })
-                });
+                const emailResult = await sendEmailJS(booking, 'reminder');
 
-                if (response.ok) {
+                if (emailResult.success) {
                     showToast('Confirmation email sent!');
                 } else {
-                    throw new Error('Failed to send email');
+                    throw new Error('Failed to send email: ' + emailResult.error);
                 }
             } catch (error) {
                 console.error('Error sending email:', error);
