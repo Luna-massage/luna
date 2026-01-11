@@ -371,7 +371,7 @@
             setupLoginForm();
             
             // Initialize EmailJS
-            if (EMAILJS_CONFIG.PUBLIC_KEY && EMAILJS_CONFIG.PUBLIC_KEY !== 'YOUR_PUBLIC_KEY') {
+            if (EMAILJS_CONFIG.PUBLIC_KEY && EMAILJS_CONFIG.PUBLIC_KEY !== '2bQtqNNP3Kd3VG7tE') {
                 emailjs.init(EMAILJS_CONFIG.PUBLIC_KEY);
             }
         });
@@ -793,7 +793,7 @@ Mark as Completed
         // Function to send email using EmailJS
         async function sendEmailJS(booking, status) {
             // Check if EmailJS is properly configured
-            if (!EMAILJS_CONFIG.SERVICE_ID || EMAILJS_CONFIG.SERVICE_ID === 'YOUR_SERVICE_ID') {
+            if (!EMAILJS_CONFIG.SERVICE_ID || EMAILJS_CONFIG.SERVICE_ID === 'service_6uxi424') {
                 throw new Error('EmailJS is not configured. Please set up your EmailJS credentials.');
             }
 
